@@ -4,6 +4,9 @@ A brutalist, web-based variable font inspector that dynamically deconstructs Tru
 
 Inspired by the bold, modular aesthetics of Wim Crouwel, Karel Martens, and the heavy geometric graphics of Buro Destruct, NoordzijRender is an experimental typography tool designed for type design students, educators, and enthusiasts.
 
+<img width="2100" height="1284" alt="Screenshot 2026-04-14 at 03 12 10" src="https://github.com/user-attachments/assets/b9067dc7-b0f7-41ba-bf82-72186bed5b40" />
+
+
 🚀 Features
 
 Drag & Drop Parsing: Instantly load local Variable Fonts (.ttf) directly into the browser.
