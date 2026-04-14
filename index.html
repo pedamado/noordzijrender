@@ -1,0 +1,1362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NoordzijRender: Deconstruct</title>
+    <script src="https://cdn.jsdelivr.net/npm/opentype.js@1.3.4/dist/opentype.min.js"></script>
+    <!-- samsa-core.js will be loaded as an ES module -->
+    <style>
+        :root {
+            --bg-color: #f4f4f4;
+            --fg-color: #111111;
+            --accent-color: rgba(255, 235, 0, 0.75);
+            --line-color: #bbbbbb;
+            --master-fill: #000000;
+            --master-stroke: #000000;
+            --drawer-bg: #111111;
+            --drawer-fg: #ffffff;
+            --font-ui: "Helvetica Neue", Helvetica, Arial, sans-serif;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root:not([data-theme="light"]) {
+                --bg-color: #111111;
+                --fg-color: #eeeeee;
+                --accent-color: rgba(255, 204, 0, 0.75);
+                --line-color: #444444;
+                --master-fill: #000000;
+                --master-stroke: #ffffff;
+                --drawer-bg: #eeeeee;
+                --drawer-fg: #111111;
+            }
+        }
+
+        html[data-theme="dark"] {
+            --bg-color: #111111;
+            --fg-color: #eeeeee;
+            --accent-color: rgba(255, 204, 0, 0.75);
+            --line-color: #444444;
+            --master-fill: #000000;
+            --master-stroke: #ffffff;
+            --drawer-bg: #eeeeee;
+            --drawer-fg: #111111;
+        }
+
+        html[data-theme="light"] {
+            --bg-color: #f4f4f4;
+            --fg-color: #111111;
+            --accent-color: rgba(255, 235, 0, 0.75);
+            --line-color: #bbbbbb;
+            --master-fill: #000000;
+            --master-stroke: #000000;
+            --drawer-bg: #111111;
+            --drawer-fg: #ffffff;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: var(--bg-color);
+            color: var(--fg-color);
+            font-family: var(--font-ui);
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            cursor: crosshair;
+        }
+
+        /* Abstract Dropzone */
+        #dropzone {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 2;
+            font-size: 2rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            pointer-events: none;
+            opacity: 0.3;
+            transition: opacity 0.2s;
+            text-align: center;
+        }
+        .dz-subtitle {
+            font-size: 12px;
+            opacity: 0.6;
+            margin-top: 15px;
+            font-weight: normal;
+            letter-spacing: 0.05em;
+        }
+        body.dragover #dropzone {
+            opacity: 1;
+            color: #ffcc00;
+        }
+        body.font-loaded #dropzone {
+            display: none;
+        }
+
+        /* UI Drawer */
+        #menu-toggle {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 100;
+            background: var(--fg-color);
+            color: var(--bg-color);
+            border: none;
+            width: 40px;
+            height: 40px;
+            font-size: 24px;
+            cursor: pointer;
+            border-radius: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+            transition: transform 0.3s ease;
+        }
+        #menu-toggle:hover {
+            transform: scale(1.1);
+        }
+
+        #drawer {
+            position: absolute;
+            top: 0;
+            right: -350px;
+            width: 320px;
+            height: 100%;
+            background-color: var(--drawer-bg);
+            color: var(--drawer-fg);
+            z-index: 50;
+            padding: 80px 25px 20px 25px;
+            box-sizing: border-box;
+            transition: right 0.4s cubic-bezier(0.19, 1, 0.22, 1);
+            overflow-y: auto;
+            box-shadow: -10px 0 30px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+        }
+        #drawer.open {
+            right: 0;
+        }
+
+        .control-group {
+            margin-bottom: 25px;
+            flex-shrink: 0;
+        }
+        .control-group label {
+            display: block;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 8px;
+            font-weight: bold;
+            opacity: 0.8;
+        }
+        
+        /* Fixed Cross-Browser Range Sliders */
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            background: transparent;
+            margin: 8px 0;
+        }
+        input[type="range"]:focus {
+            outline: none;
+        }
+        input[type="range"]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 2px;
+            background: var(--drawer-fg);
+            opacity: 0.5;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 8px;
+            background: var(--drawer-fg);
+            margin-top: -7px;
+            cursor: pointer;
+            border: none;
+        }
+        input[type="range"]::-moz-range-track {
+            width: 100%;
+            height: 2px;
+            background: var(--drawer-fg);
+            opacity: 0.5;
+            border: none;
+        }
+        input[type="range"]::-moz-range-thumb {
+            height: 16px;
+            width: 8px;
+            background: var(--drawer-fg);
+            border: none;
+            cursor: pointer;
+            border-radius: 0;
+        }
+
+        select, input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            background: transparent;
+            border: 1px solid var(--drawer-fg);
+            color: var(--drawer-fg);
+            font-family: var(--font-ui);
+            font-size: 12px;
+            border-radius: 0;
+            outline: none;
+            box-sizing: border-box;
+        }
+        select option {
+            background: var(--drawer-bg);
+            color: var(--drawer-fg);
+        }
+        
+        .btn-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        button.action-btn {
+            flex: 1;
+            background: var(--drawer-fg);
+            color: var(--drawer-bg);
+            border: none;
+            padding: 10px;
+            font-weight: bold;
+            font-size: 11px;
+            text-transform: uppercase;
+            cursor: pointer;
+            letter-spacing: 0.05em;
+            transition: opacity 0.2s, transform 0.1s;
+        }
+        button.action-btn:hover {
+            opacity: 0.8;
+        }
+        button.action-btn:active {
+            transform: scale(0.98);
+        }
+        button.action-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+        
+        .header-title {
+            font-size: 14px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+            margin-bottom: 30px;
+            border-bottom: 2px solid var(--drawer-fg);
+            padding-bottom: 10px;
+            flex-shrink: 0;
+        }
+
+        /* Modal for Glyph Map */
+        #glyph-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 90vw;
+            max-width: 800px;
+            height: 80vh;
+            background: var(--bg-color);
+            color: var(--fg-color);
+            border: 4px solid var(--fg-color);
+            box-shadow: 15px 15px 0px var(--accent-color);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            box-sizing: border-box;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease;
+        }
+        #glyph-modal.open {
+            opacity: 1;
+            pointer-events: all;
+        }
+        #glyph-modal-header {
+            padding: 20px;
+            border-bottom: 2px solid var(--line-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        #glyph-modal-title {
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            font-size: 14px;
+        }
+        #glyph-modal-close {
+            background: none;
+            border: none;
+            color: var(--fg-color);
+            font-size: 24px;
+            cursor: pointer;
+            line-height: 1;
+        }
+        #glyph-grid {
+            flex: 1;
+            padding: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            overflow-y: auto;
+            align-content: flex-start;
+        }
+        .glyph-cell {
+            width: 45px;
+            height: 45px;
+            border: 1px solid var(--line-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            cursor: pointer;
+            transition: background 0.1s, color 0.1s;
+        }
+        .glyph-cell:hover {
+            background: var(--accent-color);
+            color: #111;
+            border-color: #111;
+        }
+
+        #footer-credits {
+            margin-top: auto; 
+            padding-top: 40px; 
+            font-size: 10px; 
+            opacity: 0.6; 
+            line-height: 1.4; 
+            text-align: left; 
+            padding-bottom: 10px;
+        }
+        
+        #message-box {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: var(--fg-color);
+            color: var(--bg-color);
+            padding: 10px 15px;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="dropzone">
+        Drop Variable Font
+        <div class="dz-subtitle">Or drop a custom <b>samsa-core.js</b> file first to load it locally!</div>
+    </div>
+    <canvas id="stage"></canvas>
+    
+    <button id="menu-toggle">+</button>
+    
+    <div id="drawer">
+        <div class="header-title">NoordzijRender</div>
+        
+        <div class="control-group">
+            <label>String / Glyphs</label>
+            <input type="text" id="ctrl-string" value="a" autocomplete="off" spellcheck="false">
+            <button class="action-btn" id="btn-glyph-map" style="width: 100%; margin-top: 5px; background: transparent; border: 1px solid var(--drawer-fg); color: var(--drawer-fg);">Open Glyph Map</button>
+        </div>
+        
+        <div class="control-group btn-row">
+            <button class="action-btn" id="btn-prev">Prev</button>
+            <button class="action-btn" id="btn-next">Next</button>
+        </div>
+
+        <div class="control-group">
+            <button class="action-btn" id="btn-anim" style="width: 100%; background: #ffcc00; color: #111;">Play / Pause (Space)</button>
+            <button class="action-btn" id="btn-ghosts" style="width: 100%; margin-top: 5px; background: transparent; border: 1px solid var(--drawer-fg); color: var(--drawer-fg);">Hide Ghosts</button>
+        </div>
+
+        <div class="control-group" style="display:flex; flex-direction:column; gap:8px;">
+            <label style="display:flex; align-items:center; gap:8px; text-transform:none; font-size:11px; cursor:pointer;"><input type="checkbox" id="ctrl-node-lines" style="margin:0;"> Node Interpolation Lines</label>
+            <label style="display:flex; align-items:center; gap:8px; text-transform:none; font-size:11px; cursor:pointer;"><input type="checkbox" id="ctrl-axis-lines" checked style="margin:0;"> Axis Lines</label>
+            <label style="display:flex; align-items:center; gap:8px; text-transform:none; font-size:11px; cursor:pointer;"><input type="checkbox" id="ctrl-axis-names" checked style="margin:0;"> Axis Names</label>
+            <label style="display:flex; align-items:center; gap:8px; text-transform:none; font-size:11px; cursor:pointer;"><input type="checkbox" id="ctrl-master-labels" checked style="margin:0;"> Master Labels</label>
+            <label style="display:flex; align-items:center; gap:8px; text-transform:none; font-size:11px; cursor:pointer;"><input type="checkbox" id="ctrl-instance-labels" style="margin:0;"> Instance Labels</label>
+        </div>
+
+        <div class="control-group">
+            <label>Font Size (Overall Scale)</label>
+            <input type="range" id="ctrl-fontsize" min="10" max="3000" value="200">
+        </div>
+
+        <div class="control-group">
+            <label>Space Scale (Cube Size)</label>
+            <input type="range" id="ctrl-scale" min="100" max="1500" value="350">
+        </div>
+        
+        <div class="control-group">
+            <label>Space Depth (Z-Axis Shift)</label>
+            <input type="range" id="ctrl-depth" min="0" max="1000" value="200">
+        </div>
+        
+        <div class="control-group">
+            <label>Node Radius</label>
+            <input type="range" id="ctrl-node" min="0" max="15" step="0.5" value="0">
+        </div>
+        
+        <div class="control-group">
+            <label>Master Fill Style</label>
+            <select id="ctrl-fill">
+                <option value="unfill">Unfilled (Contours only)</option>
+                <option value="lightGray">Light Gray</option>
+                <option value="darkGray">Dark Gray</option>
+                <option value="black" selected>Black</option>
+            </select>
+        </div>
+
+        <div class="control-group" style="margin-top: 20px;">
+            <button class="action-btn" id="btn-export">Export SVG</button>
+        </div>
+        
+        <div class="control-group">
+            <button class="action-btn" id="btn-theme" style="background: transparent; border: 1px solid var(--drawer-fg); color: var(--drawer-fg);">Toggle Light/Dark</button>
+        </div>
+
+        <div id="footer-credits">
+            Designed by Pedro Amado, FBAUP/i2ADS, within the context of the MDGPE Type Design Course and the Ligatures SIG from the i2ADS.<br><br>Coded By Gemini Pro. April 2026
+        </div>
+    </div>
+
+    <!-- Glyph Map Modal -->
+    <div id="glyph-modal">
+        <div id="glyph-modal-header">
+            <div id="glyph-modal-title">Glyph Map</div>
+            <button id="glyph-modal-close">&times;</button>
+        </div>
+        <div id="glyph-grid"></div>
+    </div>
+    
+    <div id="message-box"></div>
+
+    <script type="module">
+        import { SamsaFont, SamsaBuffer } from './samsa-core.js';
+
+        // --- State Management ---
+        const App = {
+            font: null,
+            fontSamsa: null,
+            fontOpentype: null,
+            isCFF: false,
+            axes: [],
+            corners: [],
+            edges: [],
+            glyphCache: new Set(),
+            
+            // Visual Settings
+            scale: 350,
+            depth: 200,
+            nodeRadius: 0,
+            fillStyle: 'black',
+            fontSize: 200,
+            
+            // Interaction State
+            chars: ['a'],
+            currentCharIdx: 0,
+            isAnimating: false,
+            showGhosts: true,
+            
+            showNodeLines: false,
+            showAxisLines: true,
+            showAxisNames: true,
+            showMasterLabels: true,
+            showInstanceLabels: false,
+            time: 0,
+            lastFrameTime: 0,
+            
+            // Pan Interface
+            panX: 0,
+            panY: 0,
+            isDragging: false,
+            dragStartX: 0,
+            dragStartY: 0,
+
+            // UI References
+            canvas: document.getElementById('stage'),
+            ctx: document.getElementById('stage').getContext('2d'),
+            width: window.innerWidth,
+            height: window.innerHeight
+        };
+
+        // --- Utils ---
+        function getCSSVar(name) {
+            return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+        }
+        
+        function showMessage(msg) {
+            const box = document.getElementById('message-box');
+            box.textContent = msg;
+            box.style.opacity = 1;
+            setTimeout(() => { box.style.opacity = 0; }, 4000);
+        }
+
+        // --- Initialization ---
+        window.onload = () => {
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+            setupDragAndDrop();
+            setupUI();
+            setupKeyboard();
+            
+            App.lastFrameTime = performance.now();
+            requestAnimationFrame(renderLoop);
+        };
+
+        function resizeCanvas() {
+            App.width = window.innerWidth;
+            App.height = window.innerHeight;
+            App.canvas.width = App.width;
+            App.canvas.height = App.height;
+        }
+
+        // --- File Handling (Allows JS and Font Drop) ---
+        function setupDragAndDrop() {
+            document.body.addEventListener('dragenter', (e) => {
+                e.preventDefault();
+            });
+            document.body.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                document.body.classList.add('dragover');
+            });
+            document.body.addEventListener('dragleave', () => {
+                document.body.classList.remove('dragover');
+            });
+            document.body.addEventListener('drop', (e) => {
+                e.preventDefault();
+                document.body.classList.remove('dragover');
+                
+                const file = e.dataTransfer.files[0];
+                if (!file) return;
+
+                // Load custom opentype.js library locally
+                if (file.name.endsWith('.js')) {
+                    const reader = new FileReader();
+                    reader.onload = function(evt) {
+                        try {
+                            const script = document.createElement('script');
+                            script.innerHTML = evt.target.result;
+                            document.head.appendChild(script);
+                            showMessage("Custom opentype.js loaded locally! Now drop a Variable Font.");
+                        } catch(err) {
+                            showMessage("Error loading script: " + err.message);
+                        }
+                    };
+                    reader.readAsText(file);
+                    return;
+                }
+
+                // Normal Font File Loading
+                const reader = new FileReader();
+                reader.onload = function(evt) {
+                    try {
+                        const buffer = evt.target.result;
+                        
+                        // Parse with OpenType.js to check for CFF/CFF2 tables
+                        App.fontOpentype = opentype.parse(buffer);
+                        App.isCFF = !!(App.fontOpentype.tables.cff || App.fontOpentype.tables.cff2);
+                        
+                        if (App.isCFF) {
+                            App.font = App.fontOpentype;
+                        } else {
+                            App.fontSamsa = new SamsaFont(new SamsaBuffer(buffer));
+                            if (!App.fontSamsa || !App.fontSamsa.buf) throw new Error("Invalid Samsa font.");
+                            App.font = App.fontSamsa;
+                        }
+                        
+                        document.body.classList.add('font-loaded');
+                        processFont();
+                    } catch (err) {
+                        showMessage("Error parsing font: " + err.message);
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
+        // --- Core Logic: Noordzij Cube Construction ---
+        function processFont() {
+            if (!App.font) return;
+            
+            buildGlyphCache();
+            autoSelectChar();
+
+            App.axes = [];
+            if (App.isCFF) {
+                if (App.font.tables.fvar && App.font.tables.fvar.axes) {
+                    App.axes = App.font.tables.fvar.axes.slice(0, 3);
+                }
+            } else {
+                if (App.font.fvar && App.font.fvar.axes) {
+                    App.axes = App.font.fvar.axes.slice(0, 3).map(ax => ({
+                        tag: ax.axisTag,
+                        minValue: ax.minValue,
+                        maxValue: ax.maxValue,
+                        defaultValue: ax.defaultValue
+                    }));
+                }
+            }
+
+            if (App.axes.length === 0) {
+                App.axes = [{ tag: 'wght', minValue: 400, maxValue: 700, defaultValue: 400 }];
+            }
+
+            buildDesignSpace();
+        }
+
+        function buildGlyphCache() {
+            App.glyphCache.clear();
+            const grid = document.getElementById('glyph-grid');
+            grid.innerHTML = '';
+
+            for (let i = 33; i <= 255; i++) {
+                const char = String.fromCharCode(i);
+                if (char.match(/[\x00-\x20]/)) continue;
+                const gid = App.isCFF ? App.font.charToGlyphIndex(char) : App.font.glyphIdFromUnicode(i);
+                if (gid > 0) {
+                    App.glyphCache.add(char);
+                    
+                    const cell = document.createElement('div');
+                    cell.className = 'glyph-cell';
+                    cell.textContent = char;
+                    cell.onclick = () => {
+                        const input = document.getElementById('ctrl-string');
+                        input.value = char;
+                        updateString();
+                        closeGlyphMap();
+                    };
+                    grid.appendChild(cell);
+                }
+            }
+        }
+
+        function openGlyphMap(msg = "Glyph Map") {
+            document.getElementById('glyph-modal-title').textContent = msg;
+            document.getElementById('glyph-modal').classList.add('open');
+        }
+
+        function closeGlyphMap() {
+            document.getElementById('glyph-modal').classList.remove('open');
+        }
+
+        function autoSelectChar() {
+            const priority = ['a', 'F', 'o', 'n', 't'];
+            App.chars = [];
+            
+            for (let char of priority) {
+                if (App.glyphCache.has(char)) {
+                    App.chars.push(char);
+                    break;
+                }
+            }
+            if (App.chars.length === 0 && App.glyphCache.size > 0) {
+                App.chars.push(Array.from(App.glyphCache)[0]);
+            }
+            
+            if (App.chars.length === 0) App.chars = ['a'];
+            
+            document.getElementById('ctrl-string').value = App.chars.join('');
+            updateCharNav();
+        }
+
+        function buildDesignSpace() {
+            App.corners = [];
+            App.edges = [];
+            
+            const numAxes = App.axes.length;
+            const numCorners = Math.pow(2, numAxes);
+
+            const isometricShiftX = App.depth * 0.707;
+            const isometricShiftY = App.depth * -0.707;
+
+            for (let i = 0; i < numCorners; i++) {
+                let variation = {};
+                let bitmask = i;
+                let x = 0;
+                let y = 0;
+                
+                for (let a = 0; a < numAxes; a++) {
+                    const isMax = (bitmask >> a) & 1;
+                    const axis = App.axes[a];
+                    variation[axis.tag] = isMax ? axis.maxValue : axis.minValue;
+                    
+                    if (a === 0 && isMax) x += App.scale;
+                    if (a === 1 && isMax) y += App.scale;
+                    if (a === 2 && isMax) {
+                        x += isometricShiftX;
+                        y += isometricShiftY;
+                    }
+                }
+
+                App.corners.push({ id: i, bitmask: bitmask, variation: variation, x: x, y: y });
+            }
+
+            for (let i = 0; i < numCorners; i++) {
+                for (let j = i + 1; j < numCorners; j++) {
+                    let xor = i ^ j;
+                    if ((xor & (xor - 1)) === 0 && xor !== 0) {
+                        let axisIndex = Math.log2(xor);
+                        let axis = App.axes[axisIndex];
+
+                        App.edges.push({
+                            cornerA: App.corners[i], cornerB: App.corners[j],
+                            axis: axis,
+                            speed: 0.5 + Math.random() * 1.5,
+                            phase: Math.random() * Math.PI * 2,
+                            charIdx: 0
+                        });
+                    }
+                }
+            }
+        }
+
+        function updateString() {
+            const input = document.getElementById('ctrl-string');
+            const str = input.value;
+            if (!str) return;
+
+            let invalidChar = null;
+            if (App.font) {
+                for (let char of str) {
+                    if (!App.glyphCache.has(char)) {
+                        invalidChar = char;
+                        break;
+                    }
+                }
+            }
+
+            if (invalidChar) {
+                openGlyphMap(`Glyph '${invalidChar}' not available. Select below:`);
+                input.value = App.chars.join('');
+                return;
+            }
+            
+            App.chars = str.split('');
+            App.currentCharIdx = 0;
+            App.edges.forEach(e => e.charIdx = 0);
+            updateCharNav();
+        }
+
+        function shiftChar(dir) {
+            if (App.chars.length <= 1) return;
+            App.currentCharIdx = (App.currentCharIdx + dir + App.chars.length) % App.chars.length;
+            updateCharNav();
+        }
+
+        function updateCharNav() {
+            const prevBtn = document.getElementById('btn-prev');
+            const nextBtn = document.getElementById('btn-next');
+            if (App.chars.length <= 1) {
+                prevBtn.disabled = true;
+                nextBtn.disabled = true;
+            } else {
+                prevBtn.disabled = false;
+                nextBtn.disabled = false;
+            }
+        }
+
+        // --- Simplified Path Generation (Hybrid TTF/OTF) ---
+        function getVariationPath(char, variation) {
+            if (!App.font) return null;
+            
+            if (App.isCFF) {
+                const path = App.font.getPath(char, 0, 0, App.fontSize, { variation: variation });
+                return { commands: path.commands };
+            }
+            
+            const gid = App.font.glyphIdFromUnicode(char.codePointAt(0));
+            if (!gid) return null;
+            
+            const baseGlyph = App.font.glyphs[gid] || App.font.loadGlyphById(gid);
+            const instance = App.font.instance(variation);
+            const iglyph = baseGlyph.instantiate(instance);
+            
+            const scale = App.fontSize / App.font.head.unitsPerEm;
+            const commands = [];
+            
+            if (iglyph.endPts && iglyph.points) {
+                let startPt = 0;
+                iglyph.endPts.forEach(endPt => {
+                    let contourLen = endPt - startPt + 1;
+                    let contour = [];
+                    for(let p=startPt; p<=endPt; p++) {
+                        let pt = iglyph.points[p];
+                        let nextPt = iglyph.points[(p - startPt + 1) % contourLen + startPt];
+                        contour.push(pt);
+                        if (!(pt[2] & 0x01 || nextPt[2] & 0x01)) { 
+                             contour.push([(pt[0] + nextPt[0])/2, (pt[1] + nextPt[1])/2, 1]);
+                        }
+                    }
+                    if (!(contour[0][2] & 0x01)) {
+                         contour.unshift(contour.pop());
+                    }
+                    
+                    for(let p=0; p<contour.length; p++) {
+                        let pt = contour[p];
+                        let x = pt[0] * scale;
+                        let y = -pt[1] * scale;
+                        if (p===0) {
+                            commands.push({ type: 'M', x, y });
+                        } else {
+                            if (pt[2] & 0x01) {
+                                commands.push({ type: 'L', x, y });
+                            } else {
+                                let nextPt = contour[(p+1) % contour.length];
+                                let nx = nextPt[0] * scale;
+                                let ny = -nextPt[1] * scale;
+                                commands.push({ type: 'Q', x1: x, y1: y, x: nx, y: ny });
+                                p++;
+                            }
+                        }
+                    }
+                    commands.push({ type: 'Z' });
+                    startPt = endPt+1;
+                });
+            }
+            return { commands };
+        }
+
+        function getMasterFillColor() {
+            if (App.fillStyle === 'unfill') return 'transparent';
+            if (App.fillStyle === 'black') return '#000000';
+            if (App.fillStyle === 'darkGray') return getCSSVar('--line-color'); 
+            if (App.fillStyle === 'lightGray') return getCSSVar('--bg-color'); 
+            return 'transparent';
+        }
+
+        // --- Core Render Engine ---
+        function renderLoop(timestamp) {
+            const dt = (timestamp - App.lastFrameTime) / 1000;
+            App.lastFrameTime = timestamp;
+            
+            if (App.isAnimating) {
+                App.time += dt;
+            }
+
+            const ctx = App.ctx;
+            ctx.clearRect(0, 0, App.width, App.height);
+
+            if (!App.font || App.corners.length === 0) {
+                requestAnimationFrame(renderLoop);
+                return;
+            }
+
+            let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+            App.corners.forEach(c => {
+                if (c.x < minX) minX = c.x;
+                if (c.x > maxX) maxX = c.x;
+                if (c.y < minY) minY = c.y;
+                if (c.y > maxY) maxY = c.y;
+            });
+            
+            const w = maxX - minX;
+            const h = maxY - minY;
+            
+            // Dynamic viewport positioning includes Canvas Pan values
+            const offsetX = (App.width - w) / 2 - minX + App.panX;
+            const offsetY = (App.height - h) / 2 - minY + App.fontSize * 0.7 + App.panY;
+
+            ctx.save();
+            ctx.translate(offsetX, offsetY);
+
+            const masterFill = getMasterFillColor();
+            const masterStroke = getCSSVar('--master-stroke');
+            const lineColor = getCSSVar('--line-color');
+
+            // 0. Axis Lines (straight connection between origins)
+            if (App.showAxisLines) {
+                ctx.strokeStyle = lineColor;
+                ctx.lineWidth = 2; // heavier 2px stroke
+                ctx.beginPath();
+                App.edges.forEach(edge => {
+                    ctx.moveTo(edge.cornerA.x, edge.cornerA.y);
+                    ctx.lineTo(edge.cornerB.x, edge.cornerB.y);
+                });
+                ctx.stroke();
+            }
+
+            // 1. Structural Lines (Connections) drawn per edge's active character
+            if (App.showNodeLines) {
+                ctx.strokeStyle = lineColor;
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                
+                App.edges.forEach(edge => {
+                    const activeEdgeChar = App.chars[edge.charIdx] || 'a';
+                    const pA = getVariationPath(activeEdgeChar, edge.cornerA.variation);
+                    const pB = getVariationPath(activeEdgeChar, edge.cornerB.variation);
+                    
+                    if (pA && pB && pA.commands.length === pB.commands.length) {
+                        for (let i = 0; i < pA.commands.length; i++) {
+                            const cmdA = pA.commands[i];
+                            const cmdB = pB.commands[i];
+                            
+                            if (cmdA.x !== undefined && cmdB.x !== undefined) {
+                                ctx.moveTo(edge.cornerA.x + cmdA.x, edge.cornerA.y + cmdA.y);
+                                ctx.lineTo(edge.cornerB.x + cmdB.x, edge.cornerB.y + cmdB.y);
+                            }
+                            if (cmdA.x1 !== undefined && cmdB.x1 !== undefined) {
+                                ctx.moveTo(edge.cornerA.x + cmdA.x1, edge.cornerA.y + cmdA.y1);
+                                ctx.lineTo(edge.cornerB.x + cmdB.x1, edge.cornerB.y + cmdB.y1);
+                            }
+                            if (cmdA.x2 !== undefined && cmdB.x2 !== undefined) {
+                                ctx.moveTo(edge.cornerA.x + cmdA.x2, edge.cornerA.y + cmdA.y2);
+                                ctx.lineTo(edge.cornerB.x + cmdB.x2, edge.cornerB.y + cmdB.y2);
+                            }
+                        }
+                    }
+                });
+                ctx.stroke();
+            }
+
+            // 2. Master Corners explicitly calculated and drawn
+            const drawnMasters = new Set();
+            
+            const drawMasterCorner = (corner, char) => {
+                const key = `${corner.id}-${char}`;
+                if (drawnMasters.has(key)) return;
+                drawnMasters.add(key);
+
+                const path = getVariationPath(char, corner.variation);
+                if (!path) return;
+
+                ctx.save();
+                ctx.translate(corner.x, corner.y);
+                
+                ctx.beginPath();
+                path.commands.forEach(cmd => {
+                    if (cmd.type === 'M') ctx.moveTo(cmd.x, cmd.y);
+                    else if (cmd.type === 'L') ctx.lineTo(cmd.x, cmd.y);
+                    else if (cmd.type === 'Q') ctx.quadraticCurveTo(cmd.x1, cmd.y1, cmd.x, cmd.y);
+                    else if (cmd.type === 'C') ctx.bezierCurveTo(cmd.x1, cmd.y1, cmd.x2, cmd.y2, cmd.x, cmd.y);
+                    else if (cmd.type === 'Z') ctx.closePath();
+                });
+                
+                if (App.fillStyle !== 'unfill') {
+                    ctx.fillStyle = masterFill;
+                    ctx.fill();
+                }
+                ctx.strokeStyle = masterStroke;
+                ctx.lineWidth = 1;
+                ctx.stroke();
+
+                if (App.nodeRadius > 0) {
+                    ctx.fillStyle = masterStroke;
+                    ctx.beginPath();
+                    path.commands.forEach(cmd => {
+                        if (cmd.x !== undefined) {
+                            ctx.moveTo(cmd.x, cmd.y);
+                            ctx.arc(cmd.x, cmd.y, App.nodeRadius, 0, Math.PI * 2);
+                        }
+                    });
+                    ctx.fill();
+                }
+                
+                ctx.restore();
+
+                // Labels
+                if (App.showMasterLabels) {
+                    const labelKey = `label-${corner.id}`;
+                    if (!drawnMasters.has(labelKey)) {
+                        drawnMasters.add(labelKey);
+                        ctx.fillStyle = getCSSVar('--fg-color');
+                        ctx.font = `11px ${getCSSVar('--font-ui')}`;
+                        ctx.textAlign = 'center';
+                        
+                        let labelArr = [];
+                        for (let k in corner.variation) {
+                            labelArr.push(`${k}: ${corner.variation[k]}`);
+                        }
+                        ctx.fillText(`MASTER [${corner.id}]`, corner.x, corner.y + 20);
+                        ctx.fillText(labelArr.join(' | '), corner.x, corner.y + 35);
+                    }
+                }
+            };
+
+            App.edges.forEach(edge => {
+                const activeEdgeChar = App.chars[edge.charIdx] || 'a';
+                drawMasterCorner(edge.cornerA, activeEdgeChar);
+                drawMasterCorner(edge.cornerB, activeEdgeChar);
+            });
+
+            // 3. Axis Edge Labels
+            if (App.showAxisNames) {
+                ctx.fillStyle = getCSSVar('--fg-color');
+                ctx.font = `bold 12px ${getCSSVar('--font-ui')}`;
+                App.edges.forEach(edge => {
+                    const mx = (edge.cornerA.x + edge.cornerB.x) / 2;
+                    const my = (edge.cornerA.y + edge.cornerB.y) / 2;
+                    ctx.fillText(edge.axis.tag.toUpperCase(), mx, my - 20);
+                });
+            }
+
+            // 4. Ghost Instances
+            if (App.showGhosts) {
+                const isDark = document.documentElement.getAttribute('data-theme') === 'dark' || 
+                              (document.documentElement.getAttribute('data-theme') !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+                ctx.globalCompositeOperation = isDark ? 'screen' : 'multiply';
+                
+                App.edges.forEach(edge => {
+                    const rawAngle = App.time * edge.speed + edge.phase;
+                    const prevAngle = (App.time - (App.isAnimating ? dt : 0)) * edge.speed + edge.phase;
+                    
+                    const t = (Math.sin(rawAngle) + 1) / 2;
+                    const cycles = Math.floor(rawAngle / (Math.PI * 2));
+                    const prevCycles = Math.floor(prevAngle / (Math.PI * 2));
+                    
+                    if (cycles > prevCycles && App.chars.length > 1 && App.isAnimating) {
+                        edge.charIdx = (edge.charIdx + 1) % App.chars.length;
+                    }
+
+                    let interpVar = {};
+                    for (let key in edge.cornerA.variation) {
+                        interpVar[key] = edge.cornerA.variation[key] + (edge.cornerB.variation[key] - edge.cornerA.variation[key]) * t;
+                    }
+
+                    const ix = edge.cornerA.x + (edge.cornerB.x - edge.cornerA.x) * t;
+                    const iy = edge.cornerA.y + (edge.cornerB.y - edge.cornerA.y) * t;
+
+                    const activeEdgeChar = App.chars[edge.charIdx] || 'a';
+                    const instPath = getVariationPath(activeEdgeChar, interpVar);
+
+                    if (instPath) {
+                        ctx.save();
+                        ctx.translate(ix, iy);
+                        ctx.beginPath();
+                        instPath.commands.forEach(cmd => {
+                            if (cmd.type === 'M') ctx.moveTo(cmd.x, cmd.y);
+                            else if (cmd.type === 'L') ctx.lineTo(cmd.x, cmd.y);
+                            else if (cmd.type === 'Q') ctx.quadraticCurveTo(cmd.x1, cmd.y1, cmd.x, cmd.y);
+                            else if (cmd.type === 'C') ctx.bezierCurveTo(cmd.x1, cmd.y1, cmd.x2, cmd.y2, cmd.x, cmd.y);
+                            else if (cmd.type === 'Z') ctx.closePath();
+                        });
+                        ctx.fillStyle = getCSSVar('--accent-color');
+                        ctx.fill();
+                        ctx.restore();
+                        
+                        if (App.showInstanceLabels) {
+                            ctx.save();
+                            ctx.fillStyle = getCSSVar('--fg-color');
+                            ctx.font = `10px ${getCSSVar('--font-ui')}`;
+                            ctx.textAlign = 'center';
+                            let instLabelArr = [];
+                            for (let k in interpVar) instLabelArr.push(`${k}:${Math.round(interpVar[k])}`);
+                            ctx.fillText(instLabelArr.join(' | '), ix, iy);
+                            ctx.restore();
+                        }
+                    }
+                });
+                
+                ctx.globalCompositeOperation = 'source-over';
+            }
+            
+            ctx.restore();
+            requestAnimationFrame(renderLoop);
+        }
+
+        // --- Export SVG Logic ---
+        function exportSVG() {
+            if (!App.font || App.corners.length === 0) return;
+
+            const masterFill = getMasterFillColor();
+            const masterStroke = getCSSVar('--master-stroke');
+            const lineColor = getCSSVar('--line-color');
+
+            let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+            const pad = App.fontSize;
+
+            App.corners.forEach(c => {
+                if (c.x < minX) minX = c.x;
+                if (c.x > maxX) maxX = c.x;
+                if (c.y < minY) minY = c.y;
+                if (c.y > maxY) maxY = c.y;
+            });
+            
+            minX -= pad; maxX += pad;
+            minY -= pad; maxY += pad;
+            
+            const w = maxX - minX;
+            const h = maxY - minY;
+
+            let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${minX} ${minY} ${w} ${h}" width="100%" height="100%">
+                <style>
+                    .conn { stroke: ${lineColor}; stroke-width: 1px; fill: none; }
+                    .master { fill: ${masterFill}; stroke: ${masterStroke}; stroke-width: 1px; }
+                    .node { fill: ${masterStroke}; }
+                    .label { fill: ${getCSSVar('--fg-color')}; font-family: ${getCSSVar('--font-ui')}; font-size: 11px; text-anchor: middle; }
+                    .label-bold { font-weight: bold; font-size: 12px; }
+                    .ghost { fill: #ffcc00; opacity: 0.7; mix-blend-mode: multiply; }
+                </style>
+                <g id="connections">`;
+
+            // Draw Lines
+            if (App.showAxisLines) {
+                App.edges.forEach(edge => {
+                    svg += `<line class="conn" style="stroke-width:2px;" x1="${edge.cornerA.x}" y1="${edge.cornerA.y}" x2="${edge.cornerB.x}" y2="${edge.cornerB.y}" />`;
+                });
+            }
+
+            if (App.showNodeLines) {
+                App.edges.forEach(edge => {
+                    const activeChar = App.chars[edge.charIdx] || 'a';
+                    const pA = getVariationPath(activeChar, edge.cornerA.variation);
+                    const pB = getVariationPath(activeChar, edge.cornerB.variation);
+                    
+                    if (pA && pB && pA.commands.length === pB.commands.length) {
+                        for (let i = 0; i < pA.commands.length; i++) {
+                            const cmdA = pA.commands[i];
+                            const cmdB = pB.commands[i];
+                            if (cmdA.x !== undefined && cmdB.x !== undefined) {
+                                svg += `<line class="conn" x1="${edge.cornerA.x + cmdA.x}" y1="${edge.cornerA.y + cmdA.y}" x2="${edge.cornerB.x + cmdB.x}" y2="${edge.cornerB.y + cmdB.y}" />`;
+                            }
+                        }
+                    }
+                });
+            }
+
+            if (App.showAxisNames) {
+                App.edges.forEach(edge => {
+                    const mx = (edge.cornerA.x + edge.cornerB.x) / 2;
+                    const my = (edge.cornerA.y + edge.cornerB.y) / 2;
+                    svg += `<text class="label label-bold" x="${mx}" y="${my - 20}">${edge.axis.tag.toUpperCase()}</text>`;
+                });
+            }
+
+            svg += `</g><g id="masters">`;
+
+            // Draw Masters
+            const drawnMasters = new Set();
+            App.edges.forEach(edge => {
+                const activeChar = App.chars[edge.charIdx] || 'a';
+                [edge.cornerA, edge.cornerB].forEach(c => {
+                    const key = `${c.id}-${activeChar}`;
+                    if (drawnMasters.has(key)) return;
+                    drawnMasters.add(key);
+
+                    const path = getVariationPath(activeChar, c.variation);
+                    if (!path) return;
+                    
+                    let d = "";
+                    path.commands.forEach(cmd => {
+                        if (cmd.type === 'M') d += `M ${c.x + cmd.x} ${c.y + cmd.y} `;
+                        else if (cmd.type === 'L') d += `L ${c.x + cmd.x} ${c.y + cmd.y} `;
+                        else if (cmd.type === 'Q') d += `Q ${c.x + cmd.x1} ${c.y + cmd.y1} ${c.x + cmd.x} ${c.y + cmd.y} `;
+                        else if (cmd.type === 'C') d += `C ${c.x + cmd.x1} ${c.y + cmd.y1} ${c.x + cmd.x2} ${c.y + cmd.y2} ${c.x + cmd.x} ${c.y + cmd.y} `;
+                        else if (cmd.type === 'Z') d += `Z `;
+                    });
+                    
+                    svg += `<path class="master" d="${d}" />`;
+                    
+                    if (App.nodeRadius > 0) {
+                        path.commands.forEach(cmd => {
+                            if (cmd.x !== undefined) {
+                                svg += `<circle class="node" cx="${c.x + cmd.x}" cy="${c.y + cmd.y}" r="${App.nodeRadius}" />`;
+                            }
+                        });
+                    }
+
+                    // Labels
+                    if (App.showMasterLabels) {
+                        const labelKey = `label-${c.id}`;
+                        if (!drawnMasters.has(labelKey)) {
+                            drawnMasters.add(labelKey);
+                            let labelArr = [];
+                            for (let k in c.variation) labelArr.push(`${k}:${c.variation[k]}`);
+                            svg += `<text class="label" x="${c.x}" y="${c.y + 20}">MASTER [${c.id}]</text>`;
+                            svg += `<text class="label" x="${c.x}" y="${c.y + 35}">${labelArr.join(' | ')}</text>`;
+                        }
+                    }
+                });
+            });
+
+            // Draw Ghosts if enabled
+            if (App.showGhosts) {
+                svg += `</g><g id="ghosts">`;
+                App.edges.forEach(edge => {
+                    const rawAngle = App.time * edge.speed + edge.phase;
+                    const t = (Math.sin(rawAngle) + 1) / 2;
+                    let interpVar = {};
+                    for (let key in edge.cornerA.variation) {
+                        interpVar[key] = edge.cornerA.variation[key] + (edge.cornerB.variation[key] - edge.cornerA.variation[key]) * t;
+                    }
+                    const ix = edge.cornerA.x + (edge.cornerB.x - edge.cornerA.x) * t;
+                    const iy = edge.cornerA.y + (edge.cornerB.y - edge.cornerA.y) * t;
+                    
+                    const activeChar = App.chars[edge.charIdx] || 'a';
+                    const instPath = getVariationPath(activeChar, interpVar);
+                    if (instPath) {
+                        let d = "";
+                        instPath.commands.forEach(cmd => {
+                            if (cmd.type === 'M') d += `M ${ix + cmd.x} ${iy + cmd.y} `;
+                            else if (cmd.type === 'L') d += `L ${ix + cmd.x} ${iy + cmd.y} `;
+                            else if (cmd.type === 'Q') d += `Q ${ix + cmd.x1} ${iy + cmd.y1} ${ix + cmd.x} ${iy + cmd.y} `;
+                            else if (cmd.type === 'C') d += `C ${ix + cmd.x1} ${iy + cmd.y1} ${ix + cmd.x2} ${iy + cmd.y2} ${ix + cmd.x} ${iy + cmd.y} `;
+                            else if (cmd.type === 'Z') d += `Z `;
+                        });
+                        svg += `<path class="ghost" d="${d}" />`;
+                        
+                        if (App.showInstanceLabels) {
+                            let instLabelArr = [];
+                            for (let k in interpVar) instLabelArr.push(`${k}:${Math.round(interpVar[k])}`);
+                            svg += `<text class="label" x="${ix}" y="${iy}">${instLabelArr.join(' | ')}</text>`;
+                        }
+                    }
+                });
+            }
+
+            svg += `</g></svg>`;
+
+            const blob = new Blob([svg], {type: "image/svg+xml"});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "noordzij_deconstruct_transparent.svg";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // --- UI Setup & Event Listeners ---
+        function setupUI() {
+            const toggle = document.getElementById('menu-toggle');
+            const drawer = document.getElementById('drawer');
+            
+            toggle.addEventListener('click', () => {
+                const isOpen = drawer.classList.toggle('open');
+                toggle.textContent = isOpen ? '×' : '+';
+            });
+
+            // Canvas Panning Interaction
+            App.canvas.addEventListener('mousedown', (e) => {
+                App.isDragging = true;
+                App.dragStartX = e.clientX - App.panX;
+                App.dragStartY = e.clientY - App.panY;
+                App.canvas.style.cursor = 'grabbing';
+            });
+            window.addEventListener('mousemove', (e) => {
+                if (!App.isDragging) return;
+                App.panX = e.clientX - App.dragStartX;
+                App.panY = e.clientY - App.dragStartY;
+            });
+            window.addEventListener('mouseup', () => {
+                App.isDragging = false;
+                App.canvas.style.cursor = 'crosshair';
+            });
+
+            document.getElementById('ctrl-string').addEventListener('input', updateString);
+            
+            document.getElementById('btn-prev').addEventListener('click', () => shiftChar(-1));
+            document.getElementById('btn-next').addEventListener('click', () => shiftChar(1));
+            
+            document.getElementById('btn-anim').addEventListener('click', () => {
+                App.isAnimating = !App.isAnimating;
+            });
+            
+            document.getElementById('btn-ghosts').addEventListener('click', (e) => {
+                App.showGhosts = !App.showGhosts;
+                e.target.textContent = App.showGhosts ? "Hide Ghosts" : "Show Ghosts";
+            });
+
+            document.getElementById('ctrl-node-lines').addEventListener('change', e => App.showNodeLines = e.target.checked);
+            document.getElementById('ctrl-axis-lines').addEventListener('change', e => App.showAxisLines = e.target.checked);
+            document.getElementById('ctrl-axis-names').addEventListener('change', e => App.showAxisNames = e.target.checked);
+            document.getElementById('ctrl-master-labels').addEventListener('change', e => App.showMasterLabels = e.target.checked);
+            document.getElementById('ctrl-instance-labels').addEventListener('change', e => App.showInstanceLabels = e.target.checked);
+
+            document.getElementById('btn-glyph-map').addEventListener('click', () => {
+                openGlyphMap("Available Font Glyphs");
+            });
+
+            document.getElementById('glyph-modal-close').addEventListener('click', closeGlyphMap);
+
+            document.getElementById('ctrl-fontsize').addEventListener('input', (e) => {
+                App.fontSize = parseInt(e.target.value);
+            });
+
+            document.getElementById('ctrl-scale').addEventListener('input', (e) => {
+                App.scale = parseInt(e.target.value);
+                buildDesignSpace();
+            });
+            
+            document.getElementById('ctrl-depth').addEventListener('input', (e) => {
+                App.depth = parseInt(e.target.value);
+                buildDesignSpace();
+            });
+            
+            document.getElementById('ctrl-node').addEventListener('input', (e) => {
+                App.nodeRadius = parseFloat(e.target.value);
+            });
+            
+            document.getElementById('ctrl-fill').addEventListener('change', (e) => {
+                App.fillStyle = e.target.value;
+            });
+
+            document.getElementById('btn-export').addEventListener('click', exportSVG);
+
+            document.getElementById('btn-theme').addEventListener('click', () => {
+                const html = document.documentElement;
+                const current = html.getAttribute('data-theme');
+                if (current === 'light') {
+                    html.setAttribute('data-theme', 'dark');
+                } else if (current === 'dark') {
+                    html.setAttribute('data-theme', 'light');
+                } else {
+                    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                    html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+                }
+            });
+        }
+
+        function setupKeyboard() {
+            window.addEventListener('keydown', (e) => {
+                if (e.target.tagName.toLowerCase() === 'input') return;
+                
+                if (e.code === 'Escape') {
+                    closeGlyphMap();
+                    return;
+                }
+
+                if (e.code === 'Space') {
+                    e.preventDefault();
+                    App.isAnimating = !App.isAnimating;
+                } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) {
+                    const input = document.getElementById('ctrl-string');
+                    if (App.chars.length <= 1) {
+                        input.value = e.key;
+                    } else {
+                        App.chars[App.currentCharIdx] = e.key;
+                        input.value = App.chars.join('');
+                    }
+                    updateString();
+                }
+            });
+        }
+    </script>
+</body>
+</html>
